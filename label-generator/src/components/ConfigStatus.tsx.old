@@ -1,0 +1,182 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { AlertTriangle, CheckCircle, Database, Settings } from 'lucide-react';
+
+interface ConfigStatusProps {
+  onConfigComplete: () => void;
+}
+
+export default function ConfigStatus({ onConfigComplete }: ConfigStatusProps) {
+  const [supabaseConfigured, setSupabaseConfigured] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
+  const [databaseStatus, setDatabaseStatus] = useState<'checking' | 'missing' | 'ready'>('checking');
+
+  useEffect(() => {
+    checkSupabaseConfig();
+    checkDatabaseTables();
+  }, []);
+
+  const checkSupabaseConfig = () => {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    
+    if (url && key && url !== 'tu_supabase_url_aqui' && key !== 'tu_supabase_anon_key_aqui') {
+      setSupabaseConfigured(true);
+    }
+  };
+
+  const checkDatabaseTables = async () => {
+    try {
+      const response = await fetch('/api/labels/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'PatchCord',
+          quantity: 0  // No generar nada, solo probar conexión
+        }),
+      });
+
+      if (response.ok) {
+        setDatabaseStatus('ready');
+        onConfigComplete();
+      } else {
+        setDatabaseStatus('missing');
+      }
+    } catch (error) {
+      console.log('Database not configured yet:', error);
+      setDatabaseStatus('missing');
+    }
+  };
+
+  if (supabaseConfigured && databaseStatus === 'ready') {
+    return null; // No mostrar nada si está configurado
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="max-w-2xl mx-auto p-8">
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          <div className="text-center mb-8">
+            <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              EFO Label Generator
+            </h1>
+            <p className="text-gray-600">
+              Configuración inicial requerida
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+              <h2 className="text-lg font-semibold text-yellow-800 mb-4 flex items-center">
+                <Database className="h-5 w-5 mr-2" />
+                Configuración de Supabase
+              </h2>
+              
+              <div className="space-y-4">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+                    <span className="text-green-600 text-sm">✓</span>
+                  </div>
+                  <span className="ml-3 text-sm text-gray-700">
+                    URL de Supabase configurada
+                  </span>
+                </div>
+                
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+                    <span className="text-green-600 text-sm">✓</span>
+                  </div>
+                  <span className="ml-3 text-sm text-gray-700">
+                    Clave anónima de Supabase configurada
+                  </span>
+                </div>
+
+                <div className="flex items-center">
+                  <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
+                    databaseStatus === 'ready' ? 'bg-green-100' : 
+                    databaseStatus === 'missing' ? 'bg-red-100' : 'bg-yellow-100'
+                  }`}>
+                    <span className={`text-sm ${
+                      databaseStatus === 'ready' ? 'text-green-600' : 
+                      databaseStatus === 'missing' ? 'text-red-600' : 'text-yellow-600'
+                    }`}>
+                      {databaseStatus === 'ready' ? '✓' : 
+                       databaseStatus === 'missing' ? '✗' : '⏳'}
+                    </span>
+                  </div>
+                  <span className="ml-3 text-sm text-gray-700">
+                    Tablas de base de datos {
+                      databaseStatus === 'ready' ? 'configuradas' : 
+                      databaseStatus === 'missing' ? 'faltan' : 'verificando...'
+                    }
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-blue-800 mb-4 flex items-center">
+                <Settings className="h-5 w-5 mr-2" />
+                Pasos para configurar
+              </h3>
+              
+              <ol className="list-decimal list-inside space-y-3 text-sm text-blue-700">
+                <li>
+                  Crear un proyecto en{' '}
+                  <a 
+                    href="https://supabase.com" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="underline hover:text-blue-800"
+                  >
+                    Supabase.com
+                  </a>
+                </li>
+                <li>Ejecutar el archivo <code className="bg-blue-100 px-2 py-1 rounded">database/schema.sql</code> en el editor SQL</li>
+                <li>Copiar la URL del proyecto y la clave anónima</li>
+                <li>Actualizar el archivo <code className="bg-blue-100 px-2 py-1 rounded">.env.local</code></li>
+                <li>Reiniciar el servidor de desarrollo</li>
+              </ol>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-6">
+              <h4 className="font-semibold text-gray-800 mb-3">Archivo .env.local</h4>
+              <pre className="bg-gray-800 text-green-400 p-4 rounded text-sm overflow-x-auto">
+{`NEXT_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_clave_anonima_aqui
+SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key_aqui`}
+              </pre>
+            </div>
+
+            <div className="text-center">
+              <button
+                onClick={() => {
+                  checkSupabaseConfig();
+                  checkDatabaseTables();
+                }}
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 mr-4"
+              >
+                Verificar Configuración
+              </button>
+              
+              {databaseStatus === 'missing' && (
+                <a
+                  href="https://dblyptsepvhulpllqamz.supabase.co"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 inline-block"
+                >
+                  Abrir Supabase Dashboard
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

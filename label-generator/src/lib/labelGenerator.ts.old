@@ -1,0 +1,135 @@
+import { v4 as uuidv4 } from 'uuid';
+import { supabaseAdmin } from './supabase';
+import { LabelType, Label, LabelBatch } from '@/types';
+import { LABEL_TYPES } from './labelTypes';
+
+export async function getLastCodeNumber(type: LabelType): Promise<number> {
+  const labelConfig = LABEL_TYPES.find(l => l.id === type);
+  if (!labelConfig) {
+    throw new Error(`Tipo de etiqueta no encontrado: ${type}`);
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('labels')
+    .select('code')
+    .eq('type', type)
+    .like('code', `${labelConfig.prefix}-%`)
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (error) {
+    throw new Error(`Error obteniendo último código: ${error.message}`);
+  }
+
+  if (!data || data.length === 0) {
+    return 0; // Empezar desde 1
+  }
+
+  const lastCode = (data[0] as any).code;
+  const numberMatch = lastCode.match(/(\d+)$/);
+  
+  if (!numberMatch) {
+    return 0;
+  }
+
+  return parseInt(numberMatch[1], 10);
+}
+
+export function generateCode(prefix: string, number: number): string {
+  // Formato: PC-000001, PCR-000001, etc.
+  return `${prefix}-${number.toString().padStart(6, '0')}`;
+}
+
+export async function generateCodes(type: LabelType, quantity: number): Promise<string[]> {
+  const labelConfig = LABEL_TYPES.find(l => l.id === type);
+  if (!labelConfig) {
+    throw new Error(`Tipo de etiqueta no encontrado: ${type}`);
+  }
+
+  const lastNumber = await getLastCodeNumber(type);
+  const codes: string[] = [];
+
+  for (let i = 1; i <= quantity; i++) {
+    const newNumber = lastNumber + i;
+    codes.push(generateCode(labelConfig.prefix, newNumber));
+  }
+
+  return codes;
+}
+
+export async function saveLabelBatch(
+  type: LabelType,
+  quantity: number,
+  codes: string[]
+): Promise<LabelBatch> {
+  const batchId = uuidv4();
+  
+  // Guardar el lote
+  const batchData = {
+    id: batchId,
+    type,
+    quantity,
+    codes,
+    printed: false
+  };
+
+  const { error: batchError } = await supabaseAdmin
+    .from('label_batches')
+    .insert(batchData);
+
+  if (batchError) {
+    throw new Error(`Error guardando lote: ${batchError.message}`);
+  }
+
+  // Guardar las etiquetas individuales
+  const labelsToInsert = codes.map(code => ({
+    code,
+    type,
+    batch: batchId,
+    printed: false
+  }));
+
+  const { error: labelsError } = await supabaseAdmin
+    .from('labels')
+    .insert(labelsToInsert);
+
+  if (labelsError) {
+    throw new Error(`Error guardando etiquetas: ${labelsError.message}`);
+  }
+
+  return {
+    id: batchId,
+    type,
+    quantity,
+    codes,
+    created_at: new Date().toISOString(),
+    printed: false
+  };
+}
+
+export async function markLabelsAsPrinted(batchId: string): Promise<void> {
+  const now = new Date().toISOString();
+  
+  // Marcar las etiquetas como impresas
+  const { error: labelsError } = await supabaseAdmin
+    .from('labels')
+    .update({ 
+      printed: true, 
+      printed_at: now 
+    } as any)
+    .eq('batch', batchId);
+
+  if (labelsError) {
+    throw new Error(`Error marcando etiquetas como impresas: ${labelsError.message}`);
+  }
+
+  // Marcar el lote como impreso
+  const { error: batchError } = await supabaseAdmin
+    .from('label_batches')
+    .update({ printed: true } as any)
+    .eq('id', batchId);
+
+  if (batchError) {
+    throw new Error(`Error marcando lote como impreso: ${batchError.message}`);
+  }
+}

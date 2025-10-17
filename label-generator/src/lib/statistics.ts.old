@@ -1,0 +1,111 @@
+import { supabaseAdmin } from './supabase';
+import { LabelType } from '@/types';
+
+export interface LabelStats {
+  totalLabels: number;
+  printedLabels: number;
+  pendingLabels: number;
+  totalBatches: number;
+  printedBatches: number;
+  labelsByType: Record<LabelType, number>;
+  recentActivity: {
+    date: string;
+    generatedCount: number;
+    printedCount: number;
+  }[];
+}
+
+export async function getLabelStatistics(): Promise<LabelStats> {
+  try {
+    // Estadísticas generales de etiquetas
+    const { data: labelStats, error: labelError } = await supabaseAdmin
+      .from('labels')
+      .select('type, printed, created_at');
+
+    if (labelError) {
+      throw new Error(`Error obteniendo estadísticas de etiquetas: ${labelError.message}`);
+    }
+
+    // Estadísticas de lotes
+    const { data: batchStats, error: batchError } = await supabaseAdmin
+      .from('label_batches')
+      .select('printed, created_at');
+
+    if (batchError) {
+      throw new Error(`Error obteniendo estadísticas de lotes: ${batchError.message}`);
+    }
+
+    const totalLabels = labelStats?.length || 0;
+    const printedLabels = labelStats?.filter((l: any) => l.printed).length || 0;
+    const pendingLabels = totalLabels - printedLabels;
+
+    const totalBatches = batchStats?.length || 0;
+    const printedBatches = batchStats?.filter((b: any) => b.printed).length || 0;
+
+    // Contar por tipo
+    const labelsByType: Record<string, number> = {};
+    labelStats?.forEach((label: any) => {
+      labelsByType[label.type] = (labelsByType[label.type] || 0) + 1;
+    });
+
+    // Actividad reciente (últimos 7 días)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const recentLabels = labelStats?.filter((l: any) => 
+      new Date(l.created_at) >= sevenDaysAgo
+    ) || [];
+
+    const recentActivity: { date: string; generatedCount: number; printedCount: number; }[] = [];
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const dayLabels = recentLabels.filter((l: any) => 
+        l.created_at.split('T')[0] === dateStr
+      );
+      
+      recentActivity.push({
+        date: dateStr,
+        generatedCount: dayLabels.length,
+        printedCount: dayLabels.filter((l: any) => l.printed).length
+      });
+    }
+
+    return {
+      totalLabels,
+      printedLabels,
+      pendingLabels,
+      totalBatches,
+      printedBatches,
+      labelsByType: labelsByType as Record<LabelType, number>,
+      recentActivity
+    };
+
+  } catch (error) {
+    console.error('Error obteniendo estadísticas:', error);
+    throw error;
+  }
+}
+
+export async function getLastGeneratedCodes(type: LabelType, limit: number = 10): Promise<string[]> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('labels')
+      .select('code')
+      .eq('type', type)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw new Error(`Error obteniendo códigos recientes: ${error.message}`);
+    }
+
+    return data?.map((item: any) => item.code) || [];
+  } catch (error) {
+    console.error('Error obteniendo códigos recientes:', error);
+    throw error;
+  }
+}

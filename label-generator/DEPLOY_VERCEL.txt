@@ -1,0 +1,102 @@
+🚀 DEPLOY A VERCEL - EFO LABEL GENERATOR
+=======================================
+
+✅ SISTEMA COMPLETAMENTE LOCAL - SIN BASE DE DATOS EXTERNA
+
+🎯 CARACTERÍSTICAS:
+✅ 100% In-App - No requiere Supabase ni base de datos
+✅ Almacenamiento en localStorage del navegador
+✅ Códigos secuenciales automáticos
+✅ 10 tipos de etiquetas soportados
+✅ Impresión térmica directa
+✅ Panel de estadísticas en tiempo real
+✅ Vista previa de etiquetas
+✅ Persistencia entre sesiones
+
+🔧 PASOS PARA DEPLOY EN VERCEL:
+
+1. PREPARAR REPOSITORIO:
+   ```bash
+   # Si no tienes git inicializado
+   git init
+   git add .
+   git commit -m "EFO Label Generator - Sistema completo"
+   ```
+
+2. SUBIR A GITHUB:
+   - Crear repositorio en github.com
+   - Conectar y subir código:
+   ```bash
+   git remote add origin https://github.com/tu-usuario/efo-label-generator.git
+   git push -u origin main
+   ```
+
+3. DEPLOY EN VERCEL:
+   - Ir a vercel.com
+   - "New Project"
+   - Importar desde GitHub
+   - Seleccionar el repositorio
+   - Framework: Next.js (auto-detectado)
+   - Configuración automática ✅
+   - Deploy!
+
+4. VARIABLES DE ENTORNO (OPCIONAL):
+   En Vercel > Settings > Environment Variables:
+   ```
+   NEXT_PUBLIC_APP_NAME=EFO Label Generator
+   NEXT_PUBLIC_STORAGE_TYPE=local
+   ```
+
+🎯 RESULTADO:
+URL en vivo: https://tu-proyecto.vercel.app
+
+📱 CARACTERÍSTICAS DEL SISTEMA:
+
+GENERACIÓN:
+✅ PC-000001, PCR-000001, PCC-000001, etc.
+✅ Códigos secuenciales automáticos
+✅ Sin duplicados
+✅ Persistencia local
+
+IMPRESIÓN:
+✅ Formato 80x60mm
+✅ Vista previa opcional
+✅ Impresión directa
+✅ Sin diálogos
+
+ESTADÍSTICAS:
+✅ Total de etiquetas generadas
+✅ Etiquetas impresas vs pendientes
+✅ Próximos números por tipo
+✅ Contadores por categoría
+
+ALMACENAMIENTO:
+✅ localStorage del navegador
+✅ Persistencia automática
+✅ No requiere backend
+✅ Funciona offline
+
+🏭 USO EN PRODUCCIÓN:
+
+1. Operario abre la URL de Vercel
+2. Selecciona tipo: "PatchCord RIMPORT"
+3. Cantidad: 50
+4. "Generar e Imprimir"
+5. Sistema genera PCR-000001 → PCR-000050
+6. Imprime directamente
+7. Datos persisten en navegador
+
+💾 BACKUP DE DATOS:
+Los datos se guardan automáticamente en localStorage.
+Para backup manual: Panel estadísticas > Ver todos los datos
+
+🔄 VENTAJAS DEL SISTEMA LOCAL:
+
+✅ Deploy inmediato sin configuración
+✅ Sin costos de base de datos
+✅ Funciona sin internet (después de cargar)
+✅ Velocidad máxima
+✅ Sin límites de requests
+✅ Simplicidad total
+
+🎉 ¡LISTO PARA SUBIR A VERCEL!
