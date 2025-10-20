@@ -176,12 +176,18 @@ export default function AdjustCoordinatesPage() {
       
       // Cargar todas las coordenadas desde Supabase
       const { supabase } = await import('@/lib/supabase');
+      
+      if (!supabase) {
+        toast.error('Supabase no configurado', { id: 'export' });
+        return;
+      }
+
       const { data, error } = await supabase.from('label_coordinates').select('*');
 
       if (error) throw error;
 
       const allCoords = LABEL_TYPES.map(type => {
-        const supabaseCoords = data?.find(d => d.label_type === type.id);
+        const supabaseCoords = data?.find((d: any) => d.label_type === type.id);
         const coordsToUse = supabaseCoords || LABEL_COORDINATES[type.id];
         
         if (supabaseCoords) {

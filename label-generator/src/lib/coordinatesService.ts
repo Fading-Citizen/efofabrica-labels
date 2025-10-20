@@ -9,6 +9,12 @@ export async function loadCoordinatesFromSupabase(
   labelType: LabelType
 ): Promise<LabelCoordinates | null> {
   try {
+    // Si supabase no está configurado, retornar null
+    if (!supabase) {
+      console.warn('Supabase not configured');
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('label_coordinates')
       .select('*')
@@ -40,6 +46,12 @@ export async function loadCoordinatesFromSupabase(
  */
 export async function loadAllCoordinatesFromSupabase(): Promise<Record<LabelType, LabelCoordinates> | null> {
   try {
+    // Si supabase no está configurado, retornar null
+    if (!supabase) {
+      console.warn('Supabase not configured');
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('label_coordinates')
       .select('*');
@@ -79,6 +91,12 @@ export async function saveCoordinatesToSupabase(
   updatedBy?: string
 ): Promise<boolean> {
   try {
+    // Si supabase no está configurado, retornar false
+    if (!supabase) {
+      console.warn('Supabase not configured');
+      return false;
+    }
+
     const row: LabelCoordinateRow = {
       label_type: labelType,
       ila1_x: coordinates.ILA1?.x ?? null,
@@ -117,6 +135,12 @@ export async function saveAllCoordinatesToSupabase(
   updatedBy?: string
 ): Promise<boolean> {
   try {
+    // Si supabase no está configurado, retornar false
+    if (!supabase) {
+      console.warn('Supabase not configured');
+      return false;
+    }
+
     const rows: LabelCoordinateRow[] = Object.entries(allCoordinates).map(([labelType, coords]) => ({
       label_type: labelType,
       ila1_x: coords.ILA1?.x ?? null,
