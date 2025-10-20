@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LabelTypeConfig, GenerateLabelResponse, Label } from '@/types';
 import { LABEL_TYPES } from '@/lib/labelTypes';
+import { LABEL_COORDINATES, LabelCoordinates } from '@/lib/labelCoordinates';
+import { loadCoordinatesFromSupabase } from '@/lib/coordinatesService';
 import toast from 'react-hot-toast';
-import { jsPDF } from 'jspdf';
 
 export default function LabelGeneratorSimple() {
   const [selectedType, setSelectedType] = useState<LabelTypeConfig | null>(null);
@@ -13,6 +14,31 @@ export default function LabelGeneratorSimple() {
   const [isPrinting, setIsPrinting] = useState(false);
   const [generatedLabels, setGeneratedLabels] = useState<Label[]>([]);
   const [currentBatchId, setCurrentBatchId] = useState<string | null>(null);
+  const [coordinates, setCoordinates] = useState<LabelCoordinates | null>(null);
+
+  // Cargar coordenadas cuando se selecciona un tipo
+  useEffect(() => {
+    if (selectedType) {
+      loadCoordinatesForType(selectedType.id);
+    }
+  }, [selectedType]);
+
+  const loadCoordinatesForType = async (labelType: string) => {
+    try {
+      const supabaseCoords = await loadCoordinatesFromSupabase(labelType as any);
+      
+      if (supabaseCoords) {
+        setCoordinates(supabaseCoords);
+      } else {
+        // Fallback a coordenadas locales
+        setCoordinates(LABEL_COORDINATES[labelType as keyof typeof LABEL_COORDINATES]);
+      }
+    } catch (error) {
+      console.error('Error loading coordinates:', error);
+      // Usar coordenadas locales como fallback
+      setCoordinates(LABEL_COORDINATES[labelType as keyof typeof LABEL_COORDINATES]);
+    }
+  };
 
   const handleTypeSelect = (type: LabelTypeConfig) => {
     setSelectedType(type);
@@ -76,6 +102,11 @@ export default function LabelGeneratorSimple() {
       return;
     }
 
+    if (!coordinates) {
+      toast.error('Error: coordenadas no disponibles');
+      return;
+    }
+
     setIsPrinting(true);
 
     try {
@@ -95,79 +126,81 @@ export default function LabelGeneratorSimple() {
         throw new Error(data.error || 'Error marcando etiquetas como impresas');
       }
 
-      // Crear PDF con las etiquetas
-      // Tamaño: 80mm x 60mm = 226.77 x 170.08 pixels a 72 DPI
-      // En jsPDF usamos unidades en mm directamente
+      // Importar jsPDF dinámicamente
+      const { jsPDF } = await import('jspdf');
+
+      // Crear PDF (80mm x 60mm en puntos: 226.77 x 170.08)
       const pdf = new jsPDF({
         orientation: 'landscape',
-        unit: 'mm',
-        format: [80, 60]
+        unit: 'pt',
+        format: [170.08, 226.77]
       });
 
-      generatedLabels.forEach((label, index) => {
-        if (index > 0) {
-          pdf.addPage([80, 60], 'landscape');
+      // Usar coordenadas cargadas (desde Supabase o fallback local)
+      const coords = coordinates;
+      const fontSize = coords.fontSize;
+
+      // Procesar cada etiqueta
+      for (let i = 0; i < generatedLabels.length; i++) {
+        const label = generatedLabels[i];
+
+        if (i > 0) {
+          pdf.addPage();
         }
 
-        // Fondo blanco
-        pdf.setFillColor(255, 255, 255);
-        pdf.rect(0, 0, 80, 60, 'F');
+        // Cargar imagen de plantilla
+        const templateUrl = `/templates/${selectedType.template}`;
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = (e) => {
+            console.error('Error cargando plantilla:', templateUrl, e);
+            reject(e);
+          };
+          image.src = templateUrl;
+        });
 
-        // Logo EFO (simulado con texto)
-        pdf.setFontSize(16);
-        pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(0, 51, 102); // #003366
-        pdf.text('EFO', 5, 10);
+        // Agregar imagen al PDF (cubrir toda la página)
+        pdf.addImage(img, 'JPEG', 0, 0, 226.77, 170.08);
 
-        // Línea separadora
-        pdf.setDrawColor(0, 51, 102);
-        pdf.setLineWidth(0.5);
-        pdf.line(5, 13, 75, 13);
-
-        // Tipo de producto
-        pdf.setFontSize(10);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(100, 100, 100);
-        pdf.text(selectedType.name, 5, 20);
-
-        // Código de etiqueta (PRINCIPAL)
-        pdf.setFontSize(18);
-        pdf.setFont('helvetica', 'bold');
+        // Configurar texto
+        pdf.setFontSize(fontSize);
         pdf.setTextColor(0, 0, 0);
-        const codeWidth = pdf.getTextWidth(label.code);
-        pdf.text(label.code, (80 - codeWidth) / 2, 35);
 
-        // Fecha
-        pdf.setFontSize(8);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(120, 120, 120);
-        const date = label.created_at 
-          ? new Date(label.created_at).toLocaleDateString('es-CL')
-          : new Date().toLocaleDateString('es-CL');
-        pdf.text(`Fecha: ${date}`, 5, 52);
+        // Dibujar código en cada campo que exista
+        if (coords.ILA1) {
+          pdf.text(label.code, coords.ILA1.x, coords.ILA1.y);
+        }
 
-        // Número de serie en la etiqueta
-        pdf.setFontSize(7);
-        pdf.text(`${index + 1}/${generatedLabels.length}`, 70, 52);
+        if (coords.ILA2) {
+          pdf.text(label.code, coords.ILA2.x, coords.ILA2.y);
+        }
 
-        // Borde de la etiqueta
-        pdf.setDrawColor(200, 200, 200);
-        pdf.setLineWidth(0.3);
-        pdf.rect(2, 2, 76, 56);
-      });
+        if (coords.RLA1) {
+          pdf.text(label.code, coords.RLA1.x, coords.RLA1.y);
+        }
 
+        if (coords.RLA2) {
+          pdf.text(label.code, coords.RLA2.x, coords.RLA2.y);
+        }
+      }
+
+      // Generar blob del PDF
+      const pdfBlob = pdf.output('blob');
+      const url = URL.createObjectURL(pdfBlob);
+      
       // Descargar PDF
       const fileName = `EFO_${selectedType.prefix}_${generatedLabels.length}_etiquetas_${new Date().toISOString().split('T')[0]}.pdf`;
-      pdf.save(fileName);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
 
       toast.success(`PDF generado: ${fileName}`);
 
       // Abrir diálogo de impresión
       setTimeout(() => {
-        const pdfBlob = pdf.output('blob');
-        const pdfUrl = URL.createObjectURL(pdfBlob);
-        const printWindow = window.open(pdfUrl, '_blank');
-        
+        const printWindow = window.open(url, '_blank');
         if (printWindow) {
           printWindow.onload = () => {
             printWindow.print();
